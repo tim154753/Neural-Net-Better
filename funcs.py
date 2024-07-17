@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 
 
 class Network:
-    def __init__(self, *args, learning_rate = 0.1):
+    def __init__(self, *args, learning_rate = 0.1, reg_strength = 0.01):
         self.layers = [np.zeros(arg) for arg in args]
         self.weights = [np.zeros((args[i+1], args[i])) for i in range(len(args)-1)]
         self.biases = [np.zeros(arg) for arg in args[1:]]
@@ -18,6 +18,7 @@ class Network:
         self.bias_gradients = [np.zeros(arg) for arg in args[1:]]
         self.num_layers = len(args)
         self.learning_rate = learning_rate
+        self.reg_strength = reg_strength
 
     def __str__(self):
         result = "This is the network"
@@ -60,11 +61,14 @@ class Network:
 
     def update(self):
         for i in range(len(self.weights)):
-            self.weights[i] = np.subtract(self.weights[i], self.weight_gradients[i] * self.learning_rate)
+            total_weight_gradient = np.add(self.weight_gradients[i] * self.learning_rate,
+                                           np.sign(self.weights[i]) * self.reg_strength)
+            self.weights[i] = np.subtract(self.weights[i], total_weight_gradient)
             self.biases[i] = np.subtract(self.biases[i], self.bias_gradients[i] * self.learning_rate)
 
 
-    def mini_batch_gradient_descent(self, batch_size, images, labels, num_epochs):
+    def mini_batch_gradient_descent(self, batch_size, images, labels, test_images, test_labels, num_epochs):
+        accuracy_list = []
         for epoch in range(num_epochs):
             print(f"\nEPOCH: {epoch}\n")
             indices = np.arange(images.shape[0])
@@ -86,10 +90,21 @@ class Network:
                     self.weight_gradients[p] /= batch_size
                     self.bias_gradients[p] /= batch_size
                 self.update()
+            accuracy_list.append(self.test(test_images, test_labels))
+        bp.plot_accuracies(accuracy_list)
+        print(f"Accuracy after {num_epochs} epochs: {accuracy_list[-1] * 100}% ")
 
+    def test(self, test_images, label_nums):
+        count = 0
+        for i in range(10000):
+            network.layers[0] = test_images[i]
+            network.generate()
+            if bp.is_correct(label_nums[i], network.layers[-1]):
+                count += 1
+        accuracy = count/10000
+        return accuracy
 
-
-network = Network(784, 110, 10, learning_rate=0.001)
+network = Network(784, 100, 10, learning_rate=0.01)
 network.initialize_wb()
 print(network)
 
@@ -99,20 +114,12 @@ test_images = bp.load_all_test_images()
 test_labels = bp.load_all_test_labels()
 label_nums = bp.load_all_test_labels("nums")
 start = time.time()
-network.mini_batch_gradient_descent(50, images, labels, 10)
+network.mini_batch_gradient_descent(100, images, labels, test_images, label_nums, 10)
 end = time.time()
 print(f"Took {end-start} sec to train")
 
+network.test(test_images, label_nums)
 
-count = 0
-for i in range(10000):
-    test_label = test_labels[i]
-    network.layers[0] = test_images[i]
-    network.generate()
-    if bp.is_correct(label_nums[i], network.layers[-1]):
-        count += 1
-
-print(f"Classified {count} correctly out of 10000 = {count/100}% accurate")
 
 number = int(input("Image number? (type \"-1\" to stop)\n"))
 while number != -1:
