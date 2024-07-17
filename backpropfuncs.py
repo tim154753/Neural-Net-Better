@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 import tkinter as tk
 import matplotlib as plt
+import matplotlib.pyplot as pltpy
 def softmax(x):
     e_x = np.exp(x - max(x))
     return e_x / e_x.sum(axis=0)
@@ -9,7 +10,6 @@ def softmax(x):
 
 def relu_prime(x):
     return np.where(x > 0, 1, 0)
-
 
 def output_layer_error(output_layer, label):
     # cross entropy loss, softmax activation for last layer
@@ -34,20 +34,14 @@ def error_from_next_layer(network, error_index):
 def find_weight_grad(network, error_index):
     # weights are organized as a j x k matrix
     # k = size(layer-1), j = size(layer)
-    # print(layer_index)
-    # print(network.layers[layer_index])
-    # print(network.layers[layer_index].shape)
     activations = network.layers[error_index]
-    # print(activations)
-    # print(activations.shape)
     error = network.errors[error_index]
-    # print(error.shape)
     gradient = np.outer(error, activations)
     return gradient
 
 
 def read_image(image_number):
-    with open("path", mode = "r+b") as file: # change image_path to actual path
+    with open("C:/Users/timma/Downloads/MNIST_ORG/t10k-images.idx3-ubyte", mode = "r+b") as file: # change image_path to actual path
         file.seek(16+image_number*784)
         pixels = np.fromfile(file, dtype=np.uint8, count = 784) / 255
         return pixels
@@ -55,26 +49,26 @@ def read_image(image_number):
 
 def read_label(label_number):
     correct_output_array = np.zeros(10)
-    with open("path", mode = "r+b") as file: # change label_path to actual path
+    with open("C:/Users/timma/Downloads/MNIST_ORG/t10k-labels.idx1-ubyte", mode = "r+b") as file: # change label_path to actual path
         file.seek(8+label_number)
         value = int.from_bytes(file.read(1), byteorder='big')
         correct_output_array[value] = 1
         return correct_output_array
 
 def load_all_images():
-    with open("path", mode = "r+b") as file: # change image_path to actual path
+    with open("C:/Users/timma/Downloads/MNIST_ORG/train-images.idx3-ubyte", mode = "r+b") as file: # change image_path to actual path
         file.seek(16)
         image_array = np.fromfile(file, dtype = np.uint8, count = 60000*784) / 255
         return image_array.reshape(60000, 784)
 
 def load_all_test_images():
-    with open("path", mode = "r+b") as file: # change test_image_path to actual path
+    with open("C:/Users/timma/Downloads/MNIST_ORG/t10k-images.idx3-ubyte", mode = "r+b") as file: # change test_image_path to actual path
         file.seek(16)
         image_array = np.fromfile(file, dtype = np.uint8, count = 10000*784) / 255
         return image_array.reshape(10000, 784)
 
 def load_all_test_labels(one_hot_or_nums = "one_hot"):
-    with open("path", mode = "r+b") as file: # change test_label_path to actual path
+    with open("C:/Users/timma/Downloads/MNIST_ORG/t10k-labels.idx1-ubyte", mode = "r+b") as file: # change test_label_path to actual path
         file.seek(8)
         label_array = np.fromfile(file, dtype=np.uint8, count = 10000)
         if(one_hot_or_nums == "nums"):
@@ -85,7 +79,7 @@ def load_all_test_labels(one_hot_or_nums = "one_hot"):
 
 
 def load_all_labels(one_hot_or_nums = "one_hot"):
-    with open("path", mode = "r+b") as file: # change label_path to actual path
+    with open("C:/Users/timma/Downloads/MNIST_ORG/train-labels.idx1-ubyte", mode = "r+b") as file: # change label_path to actual path
         file.seek(8)
         label_array = np.fromfile(file, dtype=np.uint8, count = 60000)
         if(one_hot_or_nums == "nums"):
@@ -102,6 +96,15 @@ def is_correct(expected, output):
         if value > should_be_highest:
             return False
     return True
+
+def plot_accuracies(accuracies):
+    pltpy.figure(figsize=(10,5))
+    pltpy.plot(accuracies)
+    pltpy.title("Model Accuracy Over Epochs")
+    pltpy.ylabel("Accuracy")
+    pltpy.xlabel("Epoch")
+    pltpy.show()
+
 
 def to_file(values, path):
     file = open(path, mode = 'w')
