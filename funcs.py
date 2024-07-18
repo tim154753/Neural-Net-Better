@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 
 
 class Network:
-    def __init__(self, *args, learning_rate = 0.1, reg_strength = 0.01):
+    def __init__(self, *args, learning_rate = 0.1, beta = 0.01, reg_strength = 0.001):
         self.layers = [np.zeros(arg) for arg in args]
         self.weights = [np.zeros((args[i+1], args[i])) for i in range(len(args)-1)]
         self.biases = [np.zeros(arg) for arg in args[1:]]
@@ -18,7 +18,9 @@ class Network:
         self.bias_gradients = [np.zeros(arg) for arg in args[1:]]
         self.num_layers = len(args)
         self.learning_rate = learning_rate
+        self.beta = beta
         self.reg_strength = reg_strength
+
 
     def __str__(self):
         result = "This is the network"
@@ -46,40 +48,34 @@ class Network:
 
     def backprop(self, label):
         self.errors[len(self.errors) - 1] = bp.output_layer_error(self.layers[-1], label)
-        #print(f"From backprop: this is error[-1]:\n{self.errors[-1]}")
         self.weight_gradients[-1] = np.add(self.weight_gradients[-1], bp.find_weight_grad(self, len(self.errors) - 1))
-        #self.bias_gradients[-1].fill(0)
         self.bias_gradients[-1] = np.add(self.bias_gradients[-1], self.errors[-1])
         for i in range(len(self.errors) - 2, -1, -1):
-            #print(f"From backprop: this is weights for layer {i} (shape = {np.shape(self.weights[i])}:\n{self.weights[i]}")
             self.errors[i] = bp.error_from_next_layer(self, i)
-            #print(f"From backprop: this is error {i}:\n{self.errors[i]}")
             self.weight_gradients[i] = np.add(self.weight_gradients[i], bp.find_weight_grad(self, i))
-            #self.bias_gradients[i].fill(0)
             self.bias_gradients[i] = np.add(self.bias_gradients[i], self.errors[i])
 
 
     def update(self):
         for i in range(len(self.weights)):
-            total_weight_gradient = np.add(self.weight_gradients[i] * self.learning_rate,
+            total_weight_gradient = np.add(self.weight_gradients[i],
                                            np.sign(self.weights[i]) * self.reg_strength)
-            self.weights[i] = np.subtract(self.weights[i], total_weight_gradient)
+            self.weights[i] = np.subtract(self.weights[i], total_weight_gradient * self.learning_rate)
             self.biases[i] = np.subtract(self.biases[i], self.bias_gradients[i] * self.learning_rate)
 
 
     def mini_batch_gradient_descent(self, batch_size, images, labels, test_images, test_labels, num_epochs):
         accuracy_list = []
+        velocities = [np.zeros_like(grad) for grad in self.weight_gradients]
         for epoch in range(num_epochs):
             print(f"\nEPOCH: {epoch}\n")
+            # self.learning_rate = self.learning_rate * pow(1/10, epoch//10)
             indices = np.arange(images.shape[0])
             np.random.shuffle(indices)
             images = images[indices]
             labels = labels[indices]
-            # for k in range(len(self.weight_gradients)):
-                # self.weight_gradients[k].fill(0)
-                # self.bias_gradients[k].fill(0)
             for i in range(0, len(images), batch_size):
-                #print(f"On batch {i}!\n")
+                self.weight_gradients = [np.zeros_like(grad) for grad in self.weight_gradients]
                 batch_images = images[i:i+batch_size]
                 batch_labels = labels[i:i+batch_size]
                 for j in range(len(batch_images)):
@@ -87,10 +83,13 @@ class Network:
                     self.generate()
                     self.backprop(batch_labels[j])
                 for p in range(len(self.weight_gradients)):
-                    self.weight_gradients[p] /= batch_size
+                    self.weight_gradients[p] /= batch_size  # average
+                    velocities[p] = self.beta * velocities[p] + (1 - self.beta) * self.weight_gradients[p]  # momentum
+                    self.weight_gradients[p] = velocities[p]
                     self.bias_gradients[p] /= batch_size
                 self.update()
             accuracy_list.append(self.test(test_images, test_labels))
+            print(f"EPOCH {epoch} accuracy: {accuracy_list[epoch]}\n")
         bp.plot_accuracies(accuracy_list)
         print(f"Accuracy after {num_epochs} epochs: {accuracy_list[-1] * 100}% ")
 
@@ -104,7 +103,7 @@ class Network:
         accuracy = count/10000
         return accuracy
 
-network = Network(784, 100, 10, learning_rate=0.01)
+network = Network(784, 100, 10, learning_rate=0.1, beta = 0.1, reg_strength=0.001)
 network.initialize_wb()
 print(network)
 
@@ -114,7 +113,7 @@ test_images = bp.load_all_test_images()
 test_labels = bp.load_all_test_labels()
 label_nums = bp.load_all_test_labels("nums")
 start = time.time()
-network.mini_batch_gradient_descent(100, images, labels, test_images, label_nums, 10)
+network.mini_batch_gradient_descent(100, images, labels, test_images, label_nums, 100 )
 end = time.time()
 print(f"Took {end-start} sec to train")
 
@@ -123,14 +122,16 @@ network.test(test_images, label_nums)
 
 number = int(input("Image number? (type \"-1\" to stop)\n"))
 while number != -1:
-    network.layers[0] = images[number]
+    if number > 9999:
+        number = int(input("Too high. Enter a number from 0-9999\n"))
+    network.layers[0] = test_images[number]
     network.generate()
-    pixels = images[number]
+    pixels = test_images[number]
     image = pixels.reshape((28,28))
     plt.imshow(image, cmap='gray')
     plt.show()
     print(np.argmax(network.layers[-1]))
-    number = int(input("Image number? (type \"-1\" to stop)\n"))
+    number = int(input("Image number 0-9999? (type \"-1\" to stop)\n"))
 
 '''
 window = tk.Tk()
