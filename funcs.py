@@ -95,7 +95,7 @@ class Network:
                     #velocities[p] = self.beta1 * velocities[p] + (1 - self.beta1) * self.weight_gradients[p]  # momentum
                     #rmsprops[p] = self.beta2 * rmsprops[p] + (1 - self.beta2) * (self.weight_gradients[p] ** 2)  # RMSprop
                     #self.weight_gradients[p] = velocities[p] / ((rmsprops[p] ** 0.5) + 10 ** -8)
-                    #self.weight_gradients[p] = self.weight_gradients[p] / (abs(self.weight_gradients[p]) + 10 ** -8)
+                    self.weight_gradients[p] = self.weight_gradients[p] / (abs(self.weight_gradients[p]) + 10 ** -8)
                     # above line normalizes weight gradient to either 0 or 1, immensely helps training for some reason
                     self.bias_gradients[p] /= batch_size
                 self.update()
