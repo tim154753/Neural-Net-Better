@@ -1,11 +1,9 @@
 import os
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
 import numpy as np
 import backpropfuncs as bp
 import matplotlib.pyplot as plt
 import time
 
-  # forces numpy to run on a single thread (hopefully)
 #layers size cannot change after network initialization
 
 
