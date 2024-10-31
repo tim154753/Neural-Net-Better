@@ -1,9 +1,11 @@
 import os
+
 import numpy as np
 import backpropfuncs as bp
 import matplotlib.pyplot as plt
 import time
 
+  # forces numpy to run on a single thread (hopefully)
 #layers size cannot change after network initialization
 
 
@@ -84,8 +86,8 @@ class Network:
                 batch_images = images[i:i+batch_size]
                 batch_labels = labels[i:i+batch_size]
                 for j in range(len(batch_images)):
-                    #self.layers[0] = batch_images[j]
-                    self.layers[0] = self.image_randomize(batch_images[j])  # randomly flip input image
+                    self.layers[0] = batch_images[j]
+                    self.layers[0] = self.image_shift(batch_images[j])
                     self.generate()
                     self.backprop(batch_labels[j])
                 for p in range(len(self.weight_gradients)):
@@ -104,16 +106,16 @@ class Network:
 
     def test(self, test_images, label_nums):
         count = 0
-        for i in range(10000):
-            network.layers[0] = test_images[i]
+        for i in range(1000):
+            image_num = np.random.randint(0,9998)
+            network.layers[0] = self.image_shift(test_images[image_num])
             network.generate()
-            if bp.is_correct(label_nums[i], network.layers[-1]):
+            if bp.is_correct(label_nums[image_num], network.layers[-1]):
                 count += 1
-        accuracy = count/10000
+        accuracy = count/1000
         return accuracy
 
     def image_randomize(self, image):
-        rand = np.random.random()
         image = image.reshape(28,28)
         if rand <= 0.33:
             vert_flip = np.flipud(image)
@@ -122,6 +124,15 @@ class Network:
             hor_flip = np.fliplr(image)
             return hor_flip.reshape(784)
         return image.reshape(784)
+
+    def image_shift(self, image):
+        rand_hz = np.random.randint(-4, 4)
+        rand_vt = np.random.randint(-4,4)
+        image = image.reshape(28,28)
+        image = np.roll(image, rand_hz, axis = 1)
+        image = np.roll(image, rand_vt, axis = 0)
+        image = image.flatten()
+        return image
     def saliency_map(self, image, label = None):
         self.layers[0] = image
         self.generate()
@@ -149,13 +160,14 @@ class Network:
         # now backprop through hidden layers (ReLU act. func)
         current_step = output_grad
         for i in range(len(self.layers) - 2, 0, -1):
-            grad = self.weights[i-1] * bp.relu_prime(self.layers[i]).reshape(self.layers[i].size, 1)
+            relu_prime = bp.relu_prime(self.layers[i]).reshape(self.layers[i].size, 1)
+            grad = self.weights[i-1] * relu_prime
             current_step = np.matmul(current_step, grad)
         return current_step  #  gradient of output activations with respect to input activations, of
         # shape (output_layer.size, input_layer.size) -> in this case (10, 784)
 
 
-network = Network(784, 100, 50, 10, learning_rate=0.1, beta1=0.9, beta2=0.99, reg_strength=0)
+network = Network(784, 100, 10, learning_rate=0.1, beta1=0.9, beta2=0.99, reg_strength=0)
 network.initialize_wb()
 images = bp.load_all_images()
 labels = bp.load_all_labels()
@@ -163,19 +175,20 @@ test_images = bp.load_all_test_images()
 test_labels = bp.load_all_test_labels()
 label_nums = bp.load_all_test_labels("nums")
 start = time.time()
-network.mini_batch_gradient_descent(100, images, labels, test_images, label_nums, 100)
+network.mini_batch_gradient_descent(100, images, labels, test_images, label_nums, 15)
 end = time.time()
 
 print(f"Took {end-start} sec to train")
 
+
+
 #  saliency map with respect to loss function
 
-test_image = test_images[1000]
-test_label = label_nums[1000]
-network.layers[0] = test_image
-network.generate()
-print(np.argmax(network.layers[-1]))
+test_image = test_images[100]
+test_label = label_nums[100]
 loss_map = network.saliency_map(test_image, test_label)
+print(np.argmax(network.layers[-1]))
+#print(loss_map)
 loss_pixels = loss_map.reshape(28,28)
 # normalize
 loss_pixels = loss_pixels / (np.max(loss_pixels) + 10**-6)
@@ -213,3 +226,47 @@ while number != -1:
     print(guess)
     number = int(input("Image number 0-9999? (type \"-1\" to stop)\n"))
 
+
+'''
+window = tk.Tk()
+canvas = tk.Canvas(window, width=500, height=500)
+canvas.pack()
+image = Image.new("L", (500, 500), "black")
+draw = ImageDraw.Draw(image)
+
+def draw_on_canvas(event):
+    radius = 10
+    x1, y1 = (event.x - radius), (event.y - radius)
+    x2, y2 = (event.x + radius), (event.y + radius)
+    canvas.create_oval(x1, y1, x2, y2, fill='white')
+    # draw.line([x1, y1, x2, y2], fill="black", width=50)
+    draw.ellipse([x1, y1, x2, y2], fill="white")
+
+canvas.bind("<B1-Motion>", draw_on_canvas)
+
+def classify_image():
+    resized_image = image.resize((28, 28)).convert("L")
+    image_pixels = np.asarray(resized_image) / 255.0
+    image_pixels[image_pixels < 0.1] = 0
+    plt.imshow(image_pixels * 255, cmap='gray')
+    plt.show()
+    image_pixels = image_pixels.reshape(784, )
+    # print(image_pixels)
+    network.layers[0] = image_pixels
+    network.generate()
+    print(np.argmax(network.layers[-1]))
+
+def clear_image():
+    canvas.delete("all")
+    global image, draw
+    image = Image.new("RGB", (500, 500), "black")
+    draw = ImageDraw.Draw(image)
+
+classify_button = tk.Button(window, text="Classify", command=classify_image)
+classify_button.pack()
+
+clear_button = tk.Button(window, text="Clear", command=clear_image)
+clear_button.pack()
+
+window.mainloop()
+'''
